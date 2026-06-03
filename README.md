@@ -22,137 +22,56 @@ This system supports dual roles (Admin & Seller/User), high-precision currency v
 
 ## 🏛️ Project Architecture
 
-```text
-+----------------------------------------------------+
-|               React.js Frontend (Vite)             |
-|   - Dynamic UI with Tailwind CSS                    |
-|   - Global Context (Auth, Cart, Unit Selectors)     |
-+--------------------------+-------------------------+
-                           |
-                     HTTP JSON & JWT
-                           |
-                           v
-+--------------------------+-------------------------+
-|             Express.js Server (Node.js)            |
-|   - Auth Middleware & Role Guard                    |
-|   - Unit Conversion Helpers & Order Recalculator    |
-+--------------------------+-------------------------+
-                           |
-                      Mongoose ODM
-                           |
-                           v
-+--------------------------+-------------------------+
-|                  MongoDB Atlas Database            |
-|   - Schema-validated collections                   |
-|   - Numeric indices for fast query lookups         |
-+----------------------------------------------------+
-```
+This application follows a standard three-tier full-stack architecture:
+
+* **Frontend Client (React.js + Tailwind CSS)**: 
+  * Handles the user interface, routing, and local state.
+  * Uses React Context API to manage authentication (AuthContext) and the shopping cart (CartContext).
+  * Calls backend API endpoints using standard HTTP fetch requests.
+* **Backend Server (Node.js + Express.js)**:
+  * Manages API routing, session checks, and business logic.
+  * Handles unit conversion calculations, stock verification, and database writes.
+  * Protects routes using custom authentication and authorization middlewares.
+* **Database Layer (MongoDB Atlas via Mongoose ODM)**:
+  * Stores application documents (Users, Categories, Products, and Orders).
+  * Enforces validations and indexing rules on collections.
 
 ---
 
-## 🔄 Detailed Data Flows (Detailed yet Simple)
+## 🔄 Detailed Data Flows
 
-Here is a step-by-step trace of how data moves through the application for each major feature.
-
-### 1. Authentication Flow (Login & Route Protection)
-This flow explains how a user logs in and how the app keeps pages secure.
-
-```text
-[User Types Credentials] -> (React Page: Login)
-                               |
-                        POST /api/auth/login
-                               v
-                       (Express Controller)
-                     - Query User in MongoDB
-                     - Compare bcrypt password
-                     - Generate signed JWT token
-                               |
-                   HTTP 200 OK (Returns User & JWT)
-                               v
-                         (React Client)
-                     - Save JWT in LocalStorage
-                     - Update AuthContext State
-                     - Redirect to Dashboard / Catalog
-```
-* **Frontend Guards**: The `<ProtectedRoute>` wrapper checks if the user exists in `AuthContext`. If not, it redirects to `/login`. If an Admin route is accessed by a Seller, it redirects back to the main catalog.
-* **Backend Guards**: Express routing uses `verifyToken` middleware to extract the `Authorization: Bearer <JWT>` header, decodes it using `JWT_SECRET`, and attaches the user payload to the request (`req.user`). The `isAdmin` middleware blocks anyone whose role is not `'admin'`.
-
----
+### 1. Authentication & Page Protection Flow
+1. **User Sign-In**: The user enters their email and password on the Login page and submits the form.
+2. **API Request**: The React client sends a `POST` request to `/api/auth/login` containing the credentials.
+3. **Database Validation**: The Express server finds the matching user in MongoDB and uses `bcrypt` to verify the hashed password.
+4. **Token Generation**: Upon successful verification, the server generates a signed JSON Web Token (JWT) containing the user's ID and role, and returns it to the client.
+5. **Session Saving**: The React client saves this JWT in local storage (`localStorage`) and updates the global `AuthContext` state.
+6. **Frontend Routing Guard**: The client-side `<ProtectedRoute>` checks the active user role. If the user is unauthenticated, they are redirected to `/login`.
+7. **Backend API Guard**: For protected endpoints, the server checks the `Authorization` header, decodes the token using the secret key, and rejects requests with missing or invalid tokens.
 
 ### 2. Live Pricing & Cart Addition Flow
-This flow explains how calculations occur in real-time on the frontend before placing an order.
-
-```text
-[Seller Inputs: Qty (e.g. 2.5) & Unit (e.g. kg)]
-                               |
-                     (React Component: ProductCard)
-                     - Calls convertToBaseUnit(2.5, 'kg') -> returns 2500g
-                     - Computes: 2500g * BasePrice (e.g. Rs 0.15/g)
-                     - Dynamically displays: "Estimated Subtotal: Rs 375.00"
-                               |
-                     [Seller clicks "Add to Cart"]
-                               v
-                     (React Context: CartContext)
-                     - Adds item to cart array with subtotal & unit snapshots
-                     - Navbar updates badge showing cart item count (cart.length)
-```
-
----
+1. **Selection**: A seller selects a product in the catalog, enters a quantity (e.g., `2.5`), and chooses a unit (e.g., `kg`).
+2. **Frontend Conversion**: React instantly calls the conversion utility `convertToBaseUnit(2.5, 'kg')` to convert the quantity to base units (e.g., `2500` grams).
+3. **Frontend Calculation**: React multiplies the base quantity by the product's base price to display the calculated estimated subtotal on the screen in real-time.
+4. **Cart Addition**: When the seller clicks "Add to Cart", the item details (product ID, SKU, name, quantity, unit selected, and estimated subtotal) are added to the global `CartContext` state.
+5. **Badge Update**: The cart badge in the navigation header updates to show the count of unique products (`cart.length`) currently in the cart.
 
 ### 3. Order Checkout & Stock Verification Flow
-This is the most critical flow. It highlights **security** by showing that the backend does not trust frontend prices.
+1. **Submission**: The seller reviews their cart summary and clicks "Place Order".
+2. **Secure Payload**: To prevent pricing manipulation, the frontend only sends the product ID, quantity ordered, and the unit selected to `/api/orders` (no subtotal or prices are sent from the frontend).
+3. **Database Price Retrieval**: The backend Express controller loops through the ordered items and fetches the official prices and available stock from MongoDB.
+4. **Backend Unit Conversion**: The server converts the ordered quantity to base units (e.g., converting `2.5 kg` to `2500 g`).
+5. **Inventory Verification**: The server verifies if the database `stockQuantity` is greater than or equal to the requested quantity. If insufficient, the request is rejected.
+6. **Final Pricing Recalculation**: The server multiplies the converted quantity by the database unit price to compute the true subtotal and grand total.
+7. **Database Transaction**: The server decrements the product's `stockQuantity` in the database, generates a unique order number, and saves the new Order document.
+8. **Confirmation**: The server returns a `201 Created` status, prompting the React client to clear the cart and redirect the seller to the Orders list.
 
-```text
-[Seller clicks "Place Order"] -> (React Page: Cart)
-                                     |
-               POST /api/orders (Sends ONLY ProductID, Qty, & Unit)
-                                     v
-                            (Express Controller)
-               - Fetch official product price & stock from MongoDB
-               - Convert quantity to base units (e.g., 2.5 kg -> 2500g)
-               - VERIFY: Is stockQuantity >= 2500g? (If no, throw error)
-               - CALCULATE: 2500g * Official Price = True Subtotal
-               - DEDUCT: stockQuantity = stockQuantity - 2500g in DB
-               - SAVE: Create new Order document in MongoDB
-                                     |
-                     HTTP 201 Created (Order Placed)
-                                     v
-                            (React Client)
-               - Clear Cart state
-               - Redirect to My Orders screen
-```
-
----
-
-### 4. Admin Audit & Status Update Flow
-This flow describes how an administrator reviews orders, checks the conversion calculations, and updates statuses.
-
-```text
-[Admin opens Dashboard] -> (React Page: AdminDashboard)
-                                 |
-                          GET /api/orders
-                                 v
-                       (Express Controller)
-                     - Fetch all orders from MongoDB
-                     - Populate seller's name and details
-                                 |
-                       HTTP 200 OK (Orders JSON)
-                                 v
-                         (React Client)
-                     - Displays orders list
-                     - Audits each item by showing:
-                       * Seller input (e.g. 2.5 kg)
-                       * Base unit conversion (e.g. 2500 g)
-                       * Unit price (e.g. Rs 0.15/g)
-                       * Re-calculated subtotal (e.g. Rs 375.00)
-                                 |
-                     [Admin updates Status dropdown]
-                                 v
-                       PUT /api/orders/:id/status
-                     - Express updates status in MongoDB
-                     - *Note*: If status is "cancelled", Mongoose
-                       restores the stock quantity back to the product.
-```
+### 4. Admin Dashboard Audit & Status Update Flow
+1. **Loading Data**: When the Admin Dashboard mounts, the frontend fetches all orders from `/api/orders`.
+2. **Calculations Display**: For each order, the dashboard lists items showing the seller's input, the database conversion, the unit price, and the final subtotal for transparency and auditing.
+3. **Status Update**: The admin selects a new status from the dropdown (e.g., `completed`, `processing`, or `cancelled`).
+4. **Database Modification**: The frontend sends a `PUT` request to `/api/orders/:id/status`. The server updates the status in MongoDB.
+5. **Inventory Restoration**: If an admin changes an order status to `cancelled`, a database hook automatically restores the reserved product stock quantities back to the inventory list.
 
 ---
 
