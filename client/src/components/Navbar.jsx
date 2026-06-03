@@ -41,7 +41,7 @@ export default function Navbar() {
                     Product Catalog
                   </Link>
                   <Link to="/orders" className="text-slate-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-                    My Orders / Quotes
+                    My Orders
                   </Link>
                 </>
               )}

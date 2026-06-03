@@ -127,13 +127,6 @@ export default function Cart() {
 
           <div className="flex gap-4">
             <button
-              onClick={() => handleCheckout('quotation')}
-              disabled={loading}
-              className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold px-5 py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Processing...' : 'Create Quotation'}
-            </button>
-            <button
               onClick={() => handleCheckout('order')}
               disabled={loading}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg text-sm transition-colors shadow disabled:opacity-50"

@@ -3,51 +3,42 @@ import { AuthContext } from '../context/AuthContext';
 import { formatINR } from '../utils/conversion';
 
 export default function Orders() {
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' or 'quotations'
   const [orders, setOrders] = useState([]);
-  const [quotations, setQuotations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
   const { token } = useContext(AuthContext);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchOrders = async () => {
       setLoading(true);
       setError('');
       try {
-        const endpoint = activeTab === 'orders' ? '/api/orders' : '/api/quotations';
-        const response = await fetch(endpoint, {
+        const response = await fetch('/api/orders', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
         
         if (response.ok) {
-          if (activeTab === 'orders') {
-            setOrders(data);
-          } else {
-            setQuotations(data);
-          }
+          setOrders(data);
         } else {
-          setError(data.error || 'Failed to fetch data');
+          setError(data.error || 'Failed to fetch orders');
         }
       } catch (err) {
-        setError('Network error. Failed to load list.');
+        setError('Network error. Failed to load orders.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [activeTab, token]);
+    fetchOrders();
+  }, [token]);
 
   const getStatusStyle = (status) => {
     switch (status) {
       case 'completed':
-      case 'approved':
         return 'bg-emerald-50 text-emerald-700 border-emerald-100';
       case 'cancelled':
-      case 'rejected':
         return 'bg-red-50 text-red-700 border-red-100';
       case 'processing':
         return 'bg-blue-50 text-blue-700 border-blue-100';
@@ -61,33 +52,9 @@ export default function Orders() {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Transactions History</h1>
-          <p className="text-sm text-slate-500 mt-1">View status, calculations, and conversion metrics of past orders and quotations.</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">My Orders</h1>
+          <p className="text-sm text-slate-500 mt-1">View status, calculations, and conversion metrics of past orders.</p>
         </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 mb-8">
-        <button
-          onClick={() => setActiveTab('orders')}
-          className={`py-3 px-6 font-bold text-sm border-b-2 transition-colors ${
-            activeTab === 'orders'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-indigo-600'
-          }`}
-        >
-          Orders
-        </button>
-        <button
-          onClick={() => setActiveTab('quotations')}
-          className={`py-3 px-6 font-bold text-sm border-b-2 transition-colors ${
-            activeTab === 'quotations'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-indigo-600'
-          }`}
-        >
-          Quotations
-        </button>
       </div>
 
       {error && (
@@ -99,23 +66,23 @@ export default function Orders() {
       {loading ? (
         <div className="flex justify-center items-center py-20">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-600"></div>
-          <span className="ml-3 text-slate-600 font-medium">Fetching history data...</span>
+          <span className="ml-3 text-slate-600 font-medium">Fetching orders...</span>
         </div>
-      ) : (activeTab === 'orders' ? orders : quotations).length === 0 ? (
+      ) : orders.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
           <span className="text-4xl block mb-2">📋</span>
-          <h3 className="text-lg font-semibold text-slate-800">No Records Found</h3>
-          <p className="text-slate-500 text-sm mt-1">You haven't submitted any {activeTab} yet.</p>
+          <h3 className="text-lg font-semibold text-slate-800">No Orders Found</h3>
+          <p className="text-slate-500 text-sm mt-1">You haven't placed any orders yet.</p>
         </div>
       ) : (
         <div className="space-y-6">
-          {(activeTab === 'orders' ? orders : quotations).map((item) => (
+          {orders.map((item) => (
             <div key={item._id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               {/* Card Header */}
               <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex flex-wrap justify-between items-center gap-4">
                 <div>
-                  <span className="text-sm text-slate-400 font-medium">Number</span>
-                  <p className="text-base font-bold text-slate-800">{activeTab === 'orders' ? item.orderNumber : item.quotationNumber}</p>
+                  <span className="text-sm text-slate-400 font-medium">Order Number</span>
+                  <p className="text-base font-bold text-slate-800">{item.orderNumber}</p>
                 </div>
                 <div>
                   <span className="text-sm text-slate-400 font-medium">Date</span>
