@@ -71,7 +71,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="seller@medchem.com"
+                placeholder="user@gmail.com"
               />
             </div>
             <div>
@@ -99,12 +99,6 @@ export default function Login() {
             </button>
           </div>
         </form>
-
-        <div className="mt-6 border-t border-slate-100 pt-6 text-xs text-slate-400 space-y-1">
-          <p className="font-semibold text-slate-500 mb-1">Demo Credentials:</p>
-          <p>• Admin: <strong className="text-slate-600">admin@medchem.com</strong> / password: <strong className="text-slate-600">admin123</strong></p>
-          <p>• Seller: <strong className="text-slate-600">seller@medchem.com</strong> / password: <strong className="text-slate-600">seller123</strong></p>
-        </div>
       </div>
     </div>
   );

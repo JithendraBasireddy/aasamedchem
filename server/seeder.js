@@ -26,13 +26,13 @@ const seedData = async () => {
     const users = await User.create([
       {
         name: 'AASA Admin User',
-        email: 'admin@medchem.com',
+        email: 'admin@gmail.com',
         password: 'admin123',
         role: 'admin'
       },
       {
         name: 'Jithendra Seller',
-        email: 'seller@medchem.com',
+        email: 'seller@gmail.com',
         password: 'seller123',
         role: 'seller'
       }

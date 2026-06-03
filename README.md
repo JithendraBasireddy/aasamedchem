@@ -191,12 +191,12 @@ The application will launch on [http://localhost:5173](http://localhost:5173).
 Once you seed your database, you can use these profiles to verify the role structures:
 
 * **Administrator Account**:
-  * **Email**: `admin@medchem.com`
+  * **Email**: `admin@gmail.com`
   * **Password**: `admin123`
   * **Permissions**: Access to Dashboard metrics, Product CRUD actions, stock refills, user tables, and updating Order statuses.
 
 * **Seller / User Account**:
-  * **Email**: `seller@medchem.com`
+  * **Email**: `seller@gmail.com`
   * **Password**: `seller123`
   * **Permissions**: Access to Product Catalog, Live Pricing Calculators, Cart checkout, Order creation, and Personal Order history.
 
