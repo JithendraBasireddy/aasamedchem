@@ -15,8 +15,8 @@ This system supports dual roles (Admin & Seller/User), high-precision currency v
   * Volumes: Liters (L) $\leftrightarrow$ Milliliters (mL)
   * Count: Item $\leftrightarrow$ Item
 * **Live Pricing Estimations**: Real-time pricing calculated instantly in the frontend based on the selected unit.
-* **Verification Pipelines**: Backend verifies user quantity selections and calculations against official database prices, preventing request tampering.
-* **Order & Quotation Workflows**: Sellers create draft quotations or submit final orders; Admins track and update order statuses.
+* **Verification Pipelines**: Backend recalculates and verifies user quantity selections and calculations against official database prices, preventing request tampering.
+* **Order Workflows**: Sellers checkout shopping carts into finalized orders; Admins track and update order fulfillment statuses.
 
 ---
 
@@ -50,6 +50,112 @@ This system supports dual roles (Admin & Seller/User), high-precision currency v
 
 ---
 
+## 🔄 Detailed Data Flows (Detailed yet Simple)
+
+Here is a step-by-step trace of how data moves through the application for each major feature.
+
+### 1. Authentication Flow (Login & Route Protection)
+This flow explains how a user logs in and how the app keeps pages secure.
+
+```text
+[User Types Credentials] -> (React Page: Login)
+                               |
+                        POST /api/auth/login
+                               v
+                       (Express Controller)
+                     - Query User in MongoDB
+                     - Compare bcrypt password
+                     - Generate signed JWT token
+                               |
+                   HTTP 200 OK (Returns User & JWT)
+                               v
+                         (React Client)
+                     - Save JWT in LocalStorage
+                     - Update AuthContext State
+                     - Redirect to Dashboard / Catalog
+```
+* **Frontend Guards**: The `<ProtectedRoute>` wrapper checks if the user exists in `AuthContext`. If not, it redirects to `/login`. If an Admin route is accessed by a Seller, it redirects back to the main catalog.
+* **Backend Guards**: Express routing uses `verifyToken` middleware to extract the `Authorization: Bearer <JWT>` header, decodes it using `JWT_SECRET`, and attaches the user payload to the request (`req.user`). The `isAdmin` middleware blocks anyone whose role is not `'admin'`.
+
+---
+
+### 2. Live Pricing & Cart Addition Flow
+This flow explains how calculations occur in real-time on the frontend before placing an order.
+
+```text
+[Seller Inputs: Qty (e.g. 2.5) & Unit (e.g. kg)]
+                               |
+                     (React Component: ProductCard)
+                     - Calls convertToBaseUnit(2.5, 'kg') -> returns 2500g
+                     - Computes: 2500g * BasePrice (e.g. Rs 0.15/g)
+                     - Dynamically displays: "Estimated Subtotal: Rs 375.00"
+                               |
+                     [Seller clicks "Add to Cart"]
+                               v
+                     (React Context: CartContext)
+                     - Adds item to cart array with subtotal & unit snapshots
+                     - Navbar updates badge showing cart item count (cart.length)
+```
+
+---
+
+### 3. Order Checkout & Stock Verification Flow
+This is the most critical flow. It highlights **security** by showing that the backend does not trust frontend prices.
+
+```text
+[Seller clicks "Place Order"] -> (React Page: Cart)
+                                     |
+               POST /api/orders (Sends ONLY ProductID, Qty, & Unit)
+                                     v
+                            (Express Controller)
+               - Fetch official product price & stock from MongoDB
+               - Convert quantity to base units (e.g., 2.5 kg -> 2500g)
+               - VERIFY: Is stockQuantity >= 2500g? (If no, throw error)
+               - CALCULATE: 2500g * Official Price = True Subtotal
+               - DEDUCT: stockQuantity = stockQuantity - 2500g in DB
+               - SAVE: Create new Order document in MongoDB
+                                     |
+                     HTTP 201 Created (Order Placed)
+                                     v
+                            (React Client)
+               - Clear Cart state
+               - Redirect to My Orders screen
+```
+
+---
+
+### 4. Admin Audit & Status Update Flow
+This flow describes how an administrator reviews orders, checks the conversion calculations, and updates statuses.
+
+```text
+[Admin opens Dashboard] -> (React Page: AdminDashboard)
+                                 |
+                          GET /api/orders
+                                 v
+                       (Express Controller)
+                     - Fetch all orders from MongoDB
+                     - Populate seller's name and details
+                                 |
+                       HTTP 200 OK (Orders JSON)
+                                 v
+                         (React Client)
+                     - Displays orders list
+                     - Audits each item by showing:
+                       * Seller input (e.g. 2.5 kg)
+                       * Base unit conversion (e.g. 2500 g)
+                       * Unit price (e.g. Rs 0.15/g)
+                       * Re-calculated subtotal (e.g. Rs 375.00)
+                                 |
+                     [Admin updates Status dropdown]
+                                 v
+                       PUT /api/orders/:id/status
+                     - Express updates status in MongoDB
+                     - *Note*: If status is "cancelled", Mongoose
+                       restores the stock quantity back to the product.
+```
+
+---
+
 ## 📂 Folder Structure
 
 ```text
@@ -68,7 +174,7 @@ This system supports dual roles (Admin & Seller/User), high-precision currency v
     ├── /src
     │   ├── /components     # Navbar.jsx, ProductCard.jsx, ProtectedRoute.jsx
     │   ├── /context        # AuthContext.jsx, CartContext.jsx
-    │   ├── /pages          # Login.jsx, Catalog.jsx, AdminDashboard.jsx
+    │   ├── /pages          # Login.jsx, Catalog.jsx, AdminDashboard.jsx, ManageProducts.jsx
     │   ├── /utils          # conversion.js (Unit conversions & INR formatting)
     │   ├── App.jsx         # App layouts and Route configurations
     │   ├── index.css       # Styling configuration
